@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super A'Can 線上模擬器 - Funtech 經典再現</title>
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="stylesheet" href="index.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* Custom Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        /* Default: Fit Mode */
+        #canvas {
+            width: 100% !important;
+            height: auto !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            object-fit: contain;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8), 0 0 2px var(--primary-color);
+            background: #000;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            display: block;
+            margin: 0 auto;
+        }
+
+        /* 2x Native Mode */
+        #canvas.native-scale {
+            width: 640px !important;
+            height: 480px !important;
+            max-width: none !important;
+            max-height: none !important;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-content {
+            background: #1a1a1a;
+            border: 2px solid var(--primary-color);
+            padding: 2rem;
+            border-radius: 12px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 0 30px rgba(255, 61, 0, 0.3);
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
+        .modal-title {
+            color: var(--primary-color);
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+        }
+        .modal-body {
+            color: #ccc;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+        
+        /* Debug Drawer */
+        .debug-drawer {
+            position: fixed;
+            bottom: -280px; /* Hide full height */
+            right: 20px;
+            width: 350px;
+            height: 280px;
+            background: rgba(0, 0, 0, 0.95);
+            border: 1px solid #444;
+            border-bottom: none;
+            border-radius: 10px 10px 0 0;
+            z-index: 10000;
+            transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 -5px 25px rgba(0,0,0,0.5);
+        }
+        /* Info Panel */
+        .info-panel {
+            width: 300px;
+            height: 100%;
+            min-height: 0;
+            background: var(--panel-bg);
+            border-left: 1px solid var(--border-color);
+            padding: 20px;
+            overflow-y: auto;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+            flex-shrink: 0;
+        }
+
+        .info-panel.collapsed {
+            transform: translateX(100%);
+            margin-right: -300px;
+        }
+        .debug-drawer.active {
+            bottom: 0;
+        }
+        .debug-handle {
+            width: 60px;
+            height: 24px;
+            background: #333;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            border-radius: 6px 6px 0 0;
+            border: 1px solid #444;
+            border-bottom: none;
+            position: absolute;
+            top: -24px;
+            right: 20px;
+            transition: background 0.2s, color 0.2s;
+        }
+        .debug-handle:hover {
+            background: #333;
+            color: var(--primary-color);
+        }
+        
+        .debug-drawer.active .debug-handle {
+            top: 0;
+            border-radius: 0 0 6px 6px;
+            border-top: none;
+            border-bottom: 1px solid #444;
+        }
+        #debugLog {
+            flex: 1;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 11px;
+            color: #0f0;
+            overflow-y: auto;
+            user-select: text;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+            <div class="header-left" onclick="goHome()" style="cursor: pointer;">
+                <img src="logo.png" class="header-logo" alt="A'Can Logo">
+                <div style="display: flex; flex-direction: column;">
+                    <h1 style="margin: 0; line-height: 1.2;">Super A'Can Online Emulator</h1>
+                    <p id="subTitle" style="font-size: 12px; color: var(--text-muted); margin: 0;"></p>
+                </div>
+            </div>
+        <div class="header-right" style="display: flex; align-items: center; gap: 15px;">
+            <button class="btn" id="langToggle">🇹🇼 中文</button>
+            <a href="https://github.com/anomixer/superacan-web" class="github-icon" aria-label="View source on GitHub" target="_blank" rel="noopener noreferrer" style="color: var(--text-color); text-decoration: none; display: flex; align-items: center; transition: color 0.3s;">
+                <svg height="28" aria-hidden="true" viewBox="0 0 16 16" width="28" data-view-component="true" style="fill: currentColor;">
+                    <path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.32-1.02-.08-2.12 0 0-.67-.22-2.2.82a7.42 7.42 0 0 0-4 0c-1.53-1.04-2.2-.82-2.2-.82-.4 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"></path>
+                </svg>
+            </a>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <!-- Sidebar -->
+                    <div class="sidebar" id="sidebar">
+                        <div class="search-container">
+                            <input type="text" class="search-box" id="searchBox" placeholder="🔍 搜尋遊戲 (Search games)...">
+                        </div>
+                        <div class="game-list" id="gameList"></div>
+                    </div>
+                    
+                    <div class="resizer" id="leftResizer"></div>
+                    <div class="drawer-toggle left-toggle" id="sidebarToggle">◀</div>
+                    <div class="drawer-toggle right-toggle" id="infoToggle">▶</div>
+                    
+                    <div class="emulator-area">
+            <div class="welcome-screen" id="welcomeScreen">
+                <div class="welcome-content">
+                    <div class="welcome-main">
+                        <a id="consoleLink" href="https://archive.org/details/Super-Acan-Manual" target="_blank" rel="noopener noreferrer">
+                            <img src="console.jpg" class="welcome-console-img" alt="Super A'Can Console">
+                        </a>
+                        <a id="logoLink" href="https://archive.org/details/016ACAN" target="_blank" rel="noopener noreferrer">
+                            <img src="welcome-logo.jpg" class="welcome-sub-logo" alt="Funtech Logo">
+                        </a>
+                        <p style="font-size: 1.2rem; color: #888; max-width: 600px;">
+                            體驗台灣唯一自研 16 位元遊戲主機的魅力。<br>
+                            請從左側清單選擇一款遊戲開始。
+                        </p>
+                    </div>
+                    <img src="30th-anniversary.png" class="anniversary-badge-home" alt="30th Anniversary">
+                </div>
+            </div>
+
+            <div class="emulator-container hidden" id="emulatorContainer">
+                <div class="emulator-controls">
+                    <div class="game-title-bar" id="gameTitleBar">載入中...</div>
+                    <div class="control-buttons">
+                        <button class="btn" id="muteBtn">🔈 靜音</button>
+                        <button class="btn" id="videoBtn" title="切換影像渲染模式">🎨 渲染: 硬體</button>
+                        <button class="btn" id="soundBtn" title="切換音訊核心模式">🎵 音訊: 自動</button>
+                        <button class="btn btn-primary" id="reloadBtn">🔄 重啟</button>
+                        <button class="btn" id="scaleBtn">🔍 2x</button>
+                        <button class="btn" id="fullscreenBtn">📺 全螢幕</button>
+                    </div>
+                </div>
+                <div class="emulator-content">
+                    <div class="canvas-wrapper">
+                        <canvas id="canvas"></canvas>
+                        <div id="loadingTip" class="hidden" style="position: absolute; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; color: var(--primary-color); z-index: 10;">
+                            🚀 正在加載 WASM 核心，請稍候...
+                        </div>
+                    </div>
+
+                    <div class="resizer" id="rightResizer"></div>
+                    <div class="info-panel" id="infoPanel">
+                        <div class="info-section">
+                            <h4>遊戲資訊 (Game Info)</h4>
+                            <div id="gameInfoContent"></div>
+                        </div>
+                        <div class="info-section" id="controlsSection">
+                            <h4>控制說明 (Controls)</h4>
+                            <table class="control-table" id="p1p2Table">
+                                <thead>
+                                    <tr id="tableHeader"></tr>
+                                </thead>
+                                <tbody id="tableBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="info-section" id="mameSection">
+                            <h4>MAME 操作</h4>
+                            <table class="control-table">
+                                <thead>
+                                    <tr id="mameHeader"></tr>
+                                </thead>
+                                <tbody id="mameBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="info-section" id="aboutSection">
+                            <h4>關於 Super A'Can</h4>
+                            <p id="aboutText" style="margin-bottom: 10px;">...</p>
+                            <div id="specsText" style="font-size: 11px; color: #aaa; background: #222; padding: 10px; border-radius: 5px; font-family: monospace;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Modal -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal-content">
+            <div class="modal-title">切換遊戲？</div>
+            <div class="modal-body">
+                切換遊戲需要重新啟動模擬器環境，確定要離開目前的遊戲嗎？
+            </div>
+            <div class="modal-buttons">
+                <button class="btn" id="modalCancel">取消</button>
+                <button class="btn btn-primary" id="modalConfirm">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="games.js"></script>
+    <script src="loader.js"></script>
+
+    <script>
+        // Global State
+        let currentGame = null;
+        let currentLang = localStorage.getItem('lang') || 'zh';
+
+        const langMap = {
+            zh: {
+                title: "Super A'Can Online Emulator",
+                subtitle: "共 12 款遊戲 (含音效修正)",
+                searchPlaceholder: "🔍 搜尋遊戲 (Search games)...",
+                langBtn: "🇺🇸 English",
+                gameInfo: "遊戲資訊",
+                controls: "控制說明 (可按 TAB 叫出選單更改)",
+                mameKeys: "MAME 操作",
+                aboutAcan: "關於 Super A'Can",
+                arrows: "方向鍵: 移動",
+                mameCols: ["按鍵", "功能"],
+                mameData: [
+                    ["Shift+F6", "快速存檔"],
+                    ["Shift+F7", "快速讀檔"],
+                    ["F6 + 0~9", "指定存檔位"],
+                    ["F7 + 0~9", "指定讀檔位"],
+                    ["TAB", "MAME 選單"],
+                    ["F3", "硬體重置"],
+                    ["F5", "暫停遊戲"]
+                ],
+                mameMenu: "TAB: MAME 選單",
+                mameReset: "F3: 硬體重置",
+                mamePause: "F5: 暫停遊戲",
+                p1p2Cols: ["按鈕", "1P", "2P"],
+                p1p2Data: [
+                    ["移動", "方向鍵", "RFDG"],
+                    ["A", "Ctrl", "A"],
+                    ["X", "Alt", "S"],
+                    ["B", "Space", "Q"],
+                    ["Y", "L-Shift", "W"],
+                    ["L", "Z", "E"],
+                    ["R", "X", "None"],
+                    ["Select", "5", "6"],
+                    ["Start", "1", "2"]
+                ],
+                history: "Super A'Can 是 1995 年由台灣敦煌科技推出的 16 位元遊戲主機。它搭載了強大的 Motorola 68000 處理器，性能在當時足以與世嘉 MD 和任天堂超任匹敵，是台灣遊戲產業史上的傳奇里程碑。",
+                specs: "【主要規格】\n- CPU: Motorola 68000 @ 10.74 MHz\n- Sub-CPU: MOS 6502 @ 3.58 MHz\n- Resolution: 320x240, 32768 Colors\n- Sound: 24 Channel PCM\n- VRAM: 128KB | RAM: 64KB",
+                mute: "🔈 靜音",
+                unmute: "🔊 取消靜音",
+                reload: "🔄 重啟",
+                fullscreen: "📺 全螢幕",
+                scaleFit: "🔍 切成縮放適應",
+                scaleNative: "🔍 切成原生 2x",
+                videoAccel: "🎨 渲染: 硬體",
+                videoSoft: "🎨 渲染: 軟體",
+                soundAuto: "🎵 音訊: 自動",
+                soundOriginal: "🎵 音訊: 標準",
+                soundFixed: "🎵 音訊: 修正",
+                videoTitle: "切換影像渲染模式",
+                soundTitle: "切換音訊核心模式",
+                tipSoundAuto: "已切換為 自動選擇音訊核心 (重啟後生效)",
+                tipSoundOriginal: "已切換為 標準音訊核心 (重啟後生效)",
+                tipSoundFixed: "已切換為 修正音訊核心 (重啟後生效)",
+                tipAccel: "已切換為 硬體加速 (重啟後生效)",
+                tipSoft: "已切換為 軟體渲染 (重啟後生效)",
+                loading: "🚀 正在加載 WASM 核心，請稍候...",
+                welcomeTip: "請從左側清單選擇一款遊戲開始。",
+                welcomeTitle: "體驗台灣唯一自研 16 位元遊戲主機的魅力。",
+                consoleManual: "A'Can 使用說明書",
+                logoSpecial: "尖端出版社 電視遊樂雜誌 特別企劃 A'Can特輯 - 介紹台灣本土於1995年推出的 Super A'Can 遊戲機與軟體.",
+                exitTitle: "退出遊戲？",
+                exitBody: "確定要離開目前的遊戲回到首頁嗎？",
+                switchTitle: "切換遊戲？",
+                switchBody: "切換遊戲需要重新啟動模擬器環境，確定要離開目前的遊戲嗎？",
+                confirm: "確定",
+                cancel: "取消"
+            },
+            en: {
+                title: "Super A'Can Online Emulator",
+                subtitle: "12 Games Included (with Sound Fixes)",
+                searchPlaceholder: "🔍 Search games...",
+                langBtn: "🇹🇼 中文",
+                gameInfo: "Game Information",
+                controls: "Controls (Press TAB to customize)",
+                mameKeys: "Emulator Hotkeys",
+                aboutAcan: "About Super A'Can",
+                arrows: "Arrows: Move",
+                mameCols: ["Key", "Action"],
+                mameData: [
+                    ["Shift+F6", "Quick Save"],
+                    ["Shift+F7", "Quick Load"],
+                    ["F6 + 0~9", "Save to Slot"],
+                    ["F7 + 0~9", "Load from Slot"],
+                    ["TAB", "MAME Menu"],
+                    ["F3", "Soft Reset"],
+                    ["F5", "Pause Game"]
+                ],
+                mameMenu: "TAB: MAME Menu",
+                mameReset: "F3: Soft Reset",
+                mamePause: "F5: Pause Game",
+                p1p2Cols: ["Button", "1P", "2P"],
+                p1p2Data: [
+                    ["Move", "Arrows", "RFDG"],
+                    ["A", "Ctrl", "A"],
+                    ["X", "Alt", "S"],
+                    ["B", "Space", "Q"],
+                    ["Y", "L-Shift", "W"],
+                    ["L", "Z", "E"],
+                    ["R", "X", "None"],
+                    ["Select", "5", "6"],
+                    ["Start", "1", "2"]
+                ],
+                history: "Released in 1995 by Funtech (Taiwan), the Super A'Can was a powerful 16-bit console featuring a Motorola 68000 CPU. It was technically superior to many competitors and remains a legendary milestone in Taiwan's gaming history.",
+                specs: "[Specifications]\n- CPU: Motorola 68000 @ 10.74 MHz\n- Sub-CPU: MOS 6502 @ 3.58 MHz\n- Resolution: 320x240, 32768 Colors\n- Sound: 24 Channel PCM\n- VRAM: 128KB | RAM: 64KB",
+                mute: "🔈 Mute",
+                unmute: "🔊 Unmute",
+                reload: "🔄 Restart",
+                fullscreen: "📺 Fullscreen",
+                scaleFit: "🔍 Switch to Fit Screen",
+                scaleNative: "🔍 Switch to Native 2x",
+                videoAccel: "🎨 Video: Hardware",
+                videoSoft: "🎨 Video: Software",
+                soundAuto: "🎵 Sound: Auto",
+                soundOriginal: "🎵 Sound: Original",
+                soundFixed: "🎵 Sound: Fixed",
+                videoTitle: "Toggle video rendering mode",
+                soundTitle: "Toggle audio core mode",
+                tipSoundAuto: "Switched to Auto Sound Core (Takes effect after restart)",
+                tipSoundOriginal: "Switched to Original Sound Core (Takes effect after restart)",
+                tipSoundFixed: "Switched to Fixed Sound Core (Takes effect after restart)",
+                tipAccel: "Switched to Hardware Acceleration (Takes effect after restart)",
+                tipSoft: "Switched to Software Rendering (Takes effect after restart)",
+                loading: "🚀 Loading WASM core, please wait...",
+                welcomeTip: "Please select a game from the list to start.",
+                welcomeTitle: "Experience Taiwan's only self-developed 16-bit console.",
+                consoleManual: "A'Can Manual (Chinese)",
+                logoSpecial: "The special issue, published by Sharp Point Publishing（尖端出版）in 1995, when Taiwanese game console Super A'Can unveiled. (Chinese)",
+                exitTitle: "Quit Game?",
+                exitBody: "Are you sure you want to quit and return to home?",
+                switchTitle: "Switch Game?",
+                switchBody: "Switching games requires restarting the emulator environment. Are you sure you want to leave?",
+                confirm: "Confirm",
+                cancel: "Cancel"
+            }
+        };
+
+        function updateUIStrings() {
+            const t = langMap[currentLang];
+            const h1 = document.querySelector('.header-left h1');
+            if (h1) h1.textContent = t.title;
+            
+            const subTitle = document.getElementById('subTitle');
+            if (subTitle) subTitle.textContent = t.subtitle;
+            document.getElementById('searchBox').placeholder = t.searchPlaceholder;
+            
+            const consoleLink = document.getElementById('consoleLink');
+            if (consoleLink) consoleLink.title = t.consoleManual;
+            
+            const logoLink = document.getElementById('logoLink');
+            if (logoLink) logoLink.title = t.logoSpecial;
+            document.getElementById('langToggle').textContent = t.langBtn;
+            document.getElementById('loadingTip').textContent = t.loading;
+            
+            // Buttons
+            const muteBtn = document.getElementById('muteBtn');
+            const isMuted = muteBtn.textContent.includes('取消') || muteBtn.textContent.includes('Unmute');
+            muteBtn.textContent = isMuted ? t.unmute : t.mute;
+            document.getElementById('reloadBtn').textContent = t.reload;
+            document.getElementById('fullscreenBtn').textContent = t.fullscreen;
+            
+            const scaleBtn = document.getElementById('scaleBtn');
+            const isNative = document.getElementById('canvas').classList.contains('native-scale');
+            scaleBtn.textContent = isNative ? t.scaleFit : t.scaleNative;
+
+            const videoBtn = document.getElementById('videoBtn');
+            if (videoBtn) {
+                videoBtn.textContent = window.videoMode === 'accel' ? t.videoAccel : t.videoSoft;
+                videoBtn.title = t.videoTitle;
+            }
+            const soundBtn = document.getElementById('soundBtn');
+            if (soundBtn) {
+                soundBtn.title = t.soundTitle;
+                if (window.soundMode === 'fixed') soundBtn.textContent = t.soundFixed;
+                else if (window.soundMode === 'original') soundBtn.textContent = t.soundOriginal;
+                else soundBtn.textContent = t.soundAuto;
+            }
+
+            const welcomeContent = document.querySelector('.welcome-content p');
+            if (welcomeContent) {
+                welcomeContent.innerHTML = `${t.welcomeTitle}<br>${t.welcomeTip}`;
+            }
+
+            // Update Global UI Labels
+            const sections = document.querySelectorAll('.info-section h4');
+            if (sections.length >= 4) {
+                sections[0].textContent = t.gameInfo;
+                sections[1].textContent = t.controls;
+                sections[2].textContent = t.mameKeys;
+                sections[3].textContent = t.aboutAcan;
+            }
+
+            const tableHeader = document.getElementById('tableHeader');
+            if (tableHeader) {
+                tableHeader.innerHTML = t.p1p2Cols.map(c => `<th>${c}</th>`).join('');
+            }
+            const tableBody = document.getElementById('tableBody');
+            if (tableBody) {
+                tableBody.innerHTML = t.p1p2Data.map(row => 
+                    `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`
+                ).join('');
+            }
+
+            const mameHeader = document.getElementById('mameHeader');
+            if (mameHeader) {
+                mameHeader.innerHTML = t.mameCols.map(c => `<th>${c}</th>`).join('');
+            }
+            const mameBody = document.getElementById('mameBody');
+            if (mameBody) {
+                mameBody.innerHTML = t.mameData.map(row => 
+                    `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`
+                ).join('');
+            }
+
+            const aboutText = document.getElementById('aboutText');
+            if (aboutText) {
+                aboutText.textContent = t.history;
+            }
+
+            const specsText = document.getElementById('specsText');
+            if (specsText) {
+                specsText.innerHTML = t.specs.replace(/\n/g, '<br>');
+            }
+
+            // Refresh current game info if selected
+            if (currentGame) {
+                updateInfoPanel(currentGame);
+            }
+
+            document.getElementById('modalConfirm').textContent = t.confirm;
+            document.getElementById('modalCancel').textContent = t.cancel;
+
+            renderGames(document.getElementById('searchBox').value);
+        }
+
+        // Elements
+        const gameList = document.getElementById('gameList');
+        const searchBox = document.getElementById('searchBox');
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        const emulatorContainer = document.getElementById('emulatorContainer');
+        const gameTitleBar = document.getElementById('gameTitleBar');
+        const loadingTip = document.getElementById('loadingTip');
+
+        // Initialization
+        window.addEventListener('load', () => {
+            updateUIStrings(); // Populate all labels and content immediately
+            setupInteractions();
+            checkAutoStart();
+        });
+
+        // Global callback for loader status
+        window.onEmulatorStatus = (text) => {
+            if (text && text.includes('Preparing')) {
+                loadingTip.classList.remove('hidden');
+            } else if (!text || text.includes('complete')) {
+                setTimeout(() => loadingTip.classList.add('hidden'), 2000);
+            }
+        };
+
+        function renderGames(filter = '') {
+            gameList.innerHTML = '';
+            const filterLower = filter.toLowerCase();
+            const filtered = window.games.filter(g => 
+                g.name.toLowerCase().includes(filterLower) || 
+                g.nameCh.toLowerCase().includes(filterLower)
+            );
+            const noisyGames = ['formduel', 'jttlaugh', 'speedyd', 'staiwbbl'];
+
+            filtered.forEach(game => {
+                const item = document.createElement('div');
+                item.className = `game-item ${currentGame?.id === game.id ? 'active' : ''}`;
+                const displayName = currentLang === 'zh' ? game.nameCh : game.name;
+                const subName = currentLang === 'zh' ? game.name : game.nameCh;
+                
+                const isNoisy = noisyGames.includes(game.id);
+                const soundStatus = currentLang === 'zh' ? 
+                    (isNoisy ? '音訊: 自動 = 修正' : '音訊: 自動 = 標準') : 
+                    (isNoisy ? 'Sound: Auto = Fixed' : 'Sound: Auto = Original');
+                const soundColor = isNoisy ? '#00ff00' : '#888';
+
+                item.innerHTML = `
+                    <div class="game-item-info">
+                        <h3>${displayName}</h3>
+                        <div class="name-en">${subName}</div>
+                        <div class="meta">📅 ${game.year} | 🎮 ${game.genre}</div>
+                        <div style="font-size: 11px; color: ${soundColor}; margin-top: 4px; font-family: monospace;">${soundStatus}</div>
+                    </div>
+                    <div class="game-item-thumb">
+                        <img src="thumbs/${game.id}.png" 
+                             onerror="if(this.src.endsWith('.png')){this.src='thumbs/${game.id}.jpg'}else{this.src='logo.png'}" 
+                             alt="${game.name}">
+                    </div>
+                `;
+                item.onclick = () => selectGame(game, item);
+                gameList.appendChild(item);
+            });
+        }
+
+        async function selectGame(game, itemElement) {
+            if (currentGame?.id === game.id) return;
+            
+            // MAME/Emscripten usually doesn't like hot-swapping the whole core
+            if (window.Module) {
+                const t = langMap[currentLang];
+                showModal(() => {
+                    sessionStorage.setItem('auto_start_id', game.id);
+                    window.location.reload();
+                }, t.switchTitle, t.switchBody);
+                return;
+            }
+
+            currentGame = game;
+            document.querySelectorAll('.game-item').forEach(el => el.classList.remove('active'));
+            itemElement.classList.add('active');
+            
+            // Ensure selected item is visible in the sidebar
+            itemElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            welcomeScreen.classList.add('hidden');
+            emulatorContainer.classList.remove('hidden');
+            
+            // Auto close sidebar on mobile after selection
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                if (!sidebar.classList.contains('collapsed')) {
+                    document.getElementById('sidebarToggle').click();
+                }
+            }
+            
+            // Sync toggle positions after showing container
+            setTimeout(() => {
+                const sidebar = document.getElementById('sidebar');
+                const infoPanel = document.getElementById('infoPanel');
+                document.getElementById('sidebarToggle').style.left = sidebar.classList.contains('collapsed') ? '0' : `${sidebar.offsetWidth - 16}px`;
+                document.getElementById('infoToggle').style.right = infoPanel.classList.contains('collapsed') ? '0' : `${infoPanel.offsetWidth - 16}px`;
+            }, 50);
+
+            updateInfoPanel(game);
+            await startEmulator(game);
+        }
+
+        function goHome() {
+            sessionStorage.removeItem('auto_start_id');
+            window.location.reload();
+        }
+
+        function toggleDebugDrawer(show) {
+            const drawer = document.getElementById('debugDrawer');
+            const arrow = document.getElementById('debugArrow');
+            
+            if (show === true) drawer.classList.add('active');
+            else if (show === false) drawer.classList.remove('active');
+            else drawer.classList.toggle('active');
+
+            if (arrow) {
+                arrow.textContent = drawer.classList.contains('active') ? '▼' : '▲';
+            }
+        }
+
+        function showModal(onConfirm, title, body) {
+            const modal = document.getElementById('confirmModal');
+            const confirmBtn = document.getElementById('modalConfirm');
+            const cancelBtn = document.getElementById('modalCancel');
+            const modalTitle = modal.querySelector('.modal-title');
+            const modalBody = modal.querySelector('.modal-body');
+
+            const t = langMap[currentLang];
+            confirmBtn.textContent = t.confirm;
+            cancelBtn.textContent = t.cancel;
+
+            if (title) modalTitle.textContent = title;
+            if (body) modalBody.textContent = body;
+
+            modal.classList.add('active');
+
+            confirmBtn.onclick = () => {
+                modal.classList.remove('active');
+                onConfirm();
+            };
+
+            cancelBtn.onclick = () => {
+                modal.classList.remove('active');
+            };
+        }
+
+        function updateInfoPanel(game) {
+            const content = document.getElementById('gameInfoContent');
+            const labels = currentLang === 'zh' ? 
+                { name: '名稱', en: '英文名', genre: '類型', year: '年份', dev: '開發商' } :
+                { name: 'Name', en: 'English', genre: 'Genre', year: 'Year', dev: 'Dev' };
+
+            content.innerHTML = `
+                <p><strong>${labels.name}:</strong> ${game.nameCh}</p>
+                <p><strong>${labels.en}:</strong> ${game.name}</p>
+                <p><strong>${labels.genre}:</strong> ${game.genre}</p>
+                <p><strong>${labels.year}:</strong> ${game.year}</p>
+                <p><strong>${labels.dev}:</strong> ${game.developer}</p>
+                <p style="margin-top:10px; color: #888;">${currentLang === 'zh' ? game.descCh : game.descEn}</p>
+            `;
+            gameTitleBar.textContent = `${currentLang === 'zh' ? game.nameCh : game.name}`;
+        }
+
+        async function startEmulator(game) {
+            loadingTip.classList.remove('hidden');
+            const canvas = document.getElementById('canvas');
+            await window.AcanEmulator.start(canvas, game);
+        }
+
+        function setupInteractions() {
+            searchBox.addEventListener('input', (e) => renderGames(e.target.value));
+
+            const sidebar = document.getElementById('sidebar');
+            const infoPanel = document.getElementById('infoPanel');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            const infoToggle = document.getElementById('infoToggle');
+            const leftResizer = document.getElementById('leftResizer');
+            const rightResizer = document.getElementById('rightResizer');
+
+            function toggleSidebar() {
+                const isCollapsed = sidebar.classList.toggle('collapsed');
+                sidebarToggle.textContent = isCollapsed ? '▶' : '◀';
+                const currentWidth = sidebar.offsetWidth;
+                if (isCollapsed) {
+                    sidebar.style.marginRight = `-${currentWidth}px`;
+                    sidebarToggle.style.left = '0';
+                    sidebarToggle.classList.remove('embedded');
+                } else {
+                    sidebar.style.marginRight = '0';
+                    sidebarToggle.style.left = `${currentWidth - 16}px`;
+                    sidebarToggle.classList.add('embedded');
+                }
+                leftResizer.style.display = isCollapsed ? 'none' : 'flex';
+            }
+
+            function toggleInfo() {
+                const isCollapsed = infoPanel.classList.toggle('collapsed');
+                infoToggle.textContent = isCollapsed ? '◀' : '▶';
+                const currentWidth = infoPanel.offsetWidth;
+                if (isCollapsed) {
+                    infoPanel.style.marginRight = `-${currentWidth}px`;
+                    infoToggle.style.right = '0';
+                    infoToggle.classList.remove('embedded');
+                } else {
+                    infoPanel.style.marginRight = '0';
+                    infoToggle.style.right = `${currentWidth - 16}px`;
+                    infoToggle.classList.add('embedded');
+                }
+                rightResizer.style.display = isCollapsed ? 'none' : 'flex';
+            }
+
+            sidebarToggle.onclick = (e) => { e.stopPropagation(); toggleSidebar(); };
+            infoToggle.onclick = (e) => { e.stopPropagation(); toggleInfo(); };
+
+            // Initial Position Sync
+            const isSidebarCollapsed = sidebar.classList.contains('collapsed');
+            sidebarToggle.style.left = isSidebarCollapsed ? '0' : `${sidebar.offsetWidth - 16}px`;
+            if (!isSidebarCollapsed) sidebarToggle.classList.add('embedded');
+            
+            const isInfoCollapsed = infoPanel.classList.contains('collapsed');
+            infoToggle.style.right = isInfoCollapsed ? '0' : `${infoPanel.offsetWidth - 16}px`;
+            if (!isInfoCollapsed) infoToggle.classList.add('embedded');
+
+            // Mobile optimization: Collapse right frame by default
+            if (window.innerWidth <= 768) {
+                infoPanel.classList.add('collapsed');
+                infoToggle.textContent = '◀';
+                infoToggle.style.right = '0';
+                rightResizer.style.display = 'none';
+                infoPanel.style.marginRight = `-${infoPanel.offsetWidth}px`;
+            }
+
+            // Resizing Logic
+            let isResizingLeft = false;
+            let isResizingRight = false;
+
+            leftResizer.onmousedown = (e) => {
+                if (e.target === sidebarToggle) return;
+                isResizingLeft = true;
+                document.body.style.cursor = 'col-resize';
+            };
+
+            rightResizer.onmousedown = (e) => {
+                if (e.target === infoToggle) return;
+                isResizingRight = true;
+                document.body.style.cursor = 'col-resize';
+            };
+
+            window.onmousemove = (e) => {
+                if (isResizingLeft) {
+                    const newWidth = e.clientX;
+                    if (newWidth > 200 && newWidth < 600) {
+                        sidebar.style.width = `${newWidth}px`;
+                        sidebarToggle.style.left = `${newWidth}px`;
+                    }
+                }
+                if (isResizingRight) {
+                    const rect = document.querySelector('.emulator-content').getBoundingClientRect();
+                    const newWidth = rect.right - e.clientX;
+                    if (newWidth > 200 && newWidth < 500) {
+                        infoPanel.style.width = `${newWidth}px`;
+                        infoToggle.style.right = `${newWidth}px`;
+                    }
+                }
+            };
+
+            window.onmouseup = () => {
+                isResizingLeft = false;
+                isResizingRight = false;
+                document.body.style.cursor = 'default';
+            };
+
+            // Mobile Auto-Close
+            window.addEventListener('click', (e) => {
+                if (window.innerWidth <= 768) {
+                    if (!sidebar.contains(e.target) && !sidebar.classList.contains('collapsed') && !sidebarToggle.contains(e.target)) {
+                        toggleSidebar();
+                    }
+                    if (!infoPanel.contains(e.target) && !infoPanel.classList.contains('collapsed') && !infoToggle.contains(e.target)) {
+                        toggleInfo();
+                    }
+                }
+            });
+
+            // Mobile/Desktop switch resize listener
+            let wasMobile = window.innerWidth <= 768;
+            window.addEventListener('resize', () => {
+                const isMobile = window.innerWidth <= 768;
+                if (isMobile !== wasMobile) {
+                    wasMobile = isMobile;
+                    if (currentGame) {
+                        const canvas = document.getElementById('canvas');
+                        // Force Fit to Screen mode
+                        canvas.classList.remove('native-scale');
+                        canvas.width = 320;
+                        canvas.height = 240;
+                        canvas.style.width = '';
+                        canvas.style.height = '';
+                        
+                        // Update button text
+                        const t = langMap[currentLang];
+                        const scaleBtn = document.getElementById('scaleBtn');
+                        if (scaleBtn) scaleBtn.textContent = t.scaleNative; // Since it's now Fit to Screen, button shows "Native 2x"
+                        
+                        // Trigger resize for MAME
+                        window.dispatchEvent(new Event('resize'));
+                        
+                        // Force collapse sidebars on mobile if open
+                        if (isMobile) {
+                            const sidebar = document.getElementById('sidebar');
+                            const infoPanel = document.getElementById('infoPanel');
+                            if (sidebar && !sidebar.classList.contains('collapsed')) {
+                                toggleSidebar();
+                            }
+                            if (infoPanel && !infoPanel.classList.contains('collapsed')) {
+                                toggleInfo();
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Intercept keys
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    if (!document.fullscreenElement && !document.webkitFullscreenElement && currentGame) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const t = langMap[currentLang];
+                        showModal(() => {
+                            goHome();
+                        }, t.exitTitle, t.exitBody);
+                    }
+                }
+                if (e.key === 'F5' && currentGame) {
+                    e.preventDefault(); // Prevent browser refresh
+                }
+            }, true);
+            
+            let isMuted = false;
+            document.getElementById('muteBtn').onclick = () => {
+                isMuted = !isMuted;
+                window.AcanEmulator.toggleMute(isMuted);
+                const t = langMap[currentLang];
+                document.getElementById('muteBtn').textContent = isMuted ? t.unmute : t.mute;
+            };
+
+            // Video Mode Toggle
+            const tInit = langMap[currentLang];
+            window.videoMode = localStorage.getItem('videoMode') === 'soft' ? 'soft' : 'accel';
+            document.getElementById('videoBtn').textContent = window.videoMode === 'accel' ? tInit.videoAccel : tInit.videoSoft;
+
+            // Scale Mode Init
+            const scaleMode = localStorage.getItem('scaleMode');
+            const canvasElem = document.getElementById('canvas');
+            if (scaleMode === 'native') {
+                canvasElem.classList.add('native-scale');
+                document.getElementById('scaleBtn').textContent = langMap[currentLang].scaleFit;
+            }
+            
+            document.getElementById('videoBtn').onclick = () => {
+                window.videoMode = window.videoMode === 'accel' ? 'soft' : 'accel';
+                const t = langMap[currentLang];
+                document.getElementById('videoBtn').textContent = window.videoMode === 'accel' ? t.videoAccel : t.videoSoft;
+                
+                // 使用 localStorage 記憶設定，不改動 URL，避免智障伺服器 404
+                localStorage.setItem('videoMode', window.videoMode);
+                
+                // Show floating tip
+                const tip = document.createElement('div');
+                tip.style.cssText = 'position: fixed; top: 20px; right: 20px; background: rgba(0,0,0,0.8); color: var(--primary-color); padding: 10px 20px; border-radius: 5px; z-index: 10000; border: 1px solid var(--primary-color);';
+                tip.textContent = window.videoMode === 'accel' ? t.tipAccel : t.tipSoft;
+                document.body.appendChild(tip);
+                setTimeout(() => tip.remove(), 2000);
+            };
+
+            // Sound Mode Init
+            window.soundMode = localStorage.getItem('soundMode') || 'auto';
+
+            document.getElementById('soundBtn').onclick = () => {
+                const states = ['auto', 'original', 'fixed'];
+                let idx = states.indexOf(window.soundMode);
+                idx = (idx + 1) % states.length;
+                window.soundMode = states[idx];
+                localStorage.setItem('soundMode', window.soundMode);
+                updateUIStrings();
+
+                const t = langMap[currentLang];
+                const tip = document.createElement('div');
+                tip.style.cssText = 'position: fixed; top: 20px; right: 20px; background: rgba(0,0,0,0.8); color: var(--primary-color); padding: 10px 20px; border-radius: 5px; z-index: 10000; border: 1px solid var(--primary-color);';
+                
+                if (window.soundMode === 'fixed') tip.textContent = t.tipSoundFixed;
+                else if (window.soundMode === 'original') tip.textContent = t.tipSoundOriginal;
+                else tip.textContent = t.tipSoundAuto;
+                
+                document.body.appendChild(tip);
+                setTimeout(() => tip.remove(), 2000);
+            };
+
+            document.getElementById('langToggle').onclick = () => {
+                currentLang = currentLang === 'zh' ? 'en' : 'zh';
+                localStorage.setItem('lang', currentLang);
+                updateUIStrings();
+            };
+
+            document.getElementById('reloadBtn').onclick = () => {
+                if (currentGame) {
+                    sessionStorage.setItem('auto_start_id', currentGame.id);
+                    window.location.reload();
+                }
+            };
+
+            document.getElementById('fullscreenBtn').onclick = () => {
+                const elem = document.getElementById('canvas');
+                if (elem.requestFullscreen) elem.requestFullscreen();
+                else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+                
+                // Listen for exiting fullscreen to reset resolution
+                const exitHandler = () => {
+                    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                        const canvas = document.getElementById('canvas');
+                        canvas.width = 320;
+                        canvas.height = 240;
+                        window.dispatchEvent(new Event('resize'));
+                        document.removeEventListener('fullscreenchange', exitHandler);
+                        document.removeEventListener('webkitfullscreenchange', exitHandler);
+                    }
+                };
+                document.addEventListener('fullscreenchange', exitHandler);
+                document.addEventListener('webkitfullscreenchange', exitHandler);
+            };
+
+            document.getElementById('scaleBtn').onclick = () => {
+                const canvas = document.getElementById('canvas');
+                const isNative = canvas.classList.toggle('native-scale');
+                
+                // 使用 localStorage 記憶設定
+                localStorage.setItem('scaleMode', isNative ? 'native' : 'fit');
+                
+                // FORCE RESET: When toggling, reset the internal attributes to native A'Can resolution
+                // This stops MAME from keeping fullscreen-sized attributes in windowed mode
+                canvas.width = 320;
+                canvas.height = 240;
+                
+                // Clear inline styles
+                canvas.style.width = '';
+                canvas.style.height = '';
+
+                const t = langMap[currentLang];
+                document.getElementById('scaleBtn').textContent = isNative ? t.scaleFit : t.scaleNative;
+                
+                // Trigger a window resize event to tell MAME to recalculate
+                window.dispatchEvent(new Event('resize'));
+            };
+        }
+
+        function checkAutoStart() {
+            const autoStartId = sessionStorage.getItem('auto_start_id');
+            if (autoStartId) {
+                sessionStorage.removeItem('auto_start_id');
+                const game = window.games.find(g => g.id === autoStartId);
+                if (game) {
+                    setTimeout(() => {
+                        const items = document.querySelectorAll('.game-item');
+                        for (let item of items) {
+                            if (item.innerText.includes(game.nameCh)) {
+                                selectGame(game, item);
+                                break;
+                            }
+                        }
+                    }, 300);
+                }
+            }
+        }
+    </script>
+    
+    <!-- Virtual Joypad Script -->
+    <script>
+        function initVirtualJoypad() {
+            const buttons = document.querySelectorAll('.joy-btn-trigger');
+            console.log(`[Joypad] Initializing ${buttons.length} buttons`);
+            
+            buttons.forEach(btn => {
+                const key = btn.getAttribute('data-key');
+                const code = btn.getAttribute('data-code');
+                
+                const handlePress = (e) => {
+                    e.preventDefault();
+                    // Simulate keydown
+                    const event = new KeyboardEvent('keydown', { 
+                        key: key, 
+                        code: code, 
+                        bubbles: true,
+                        cancelable: true
+                    });
+                    document.dispatchEvent(event);
+                    
+                    // Add active class for visual feedback on touch
+                    btn.style.transform = 'translateY(4px)';
+                    btn.style.boxShadow = '0 0 0 #111';
+                    btn.style.background = 'var(--primary-color)';
+                };
+                
+                const handleRelease = (e) => {
+                    e.preventDefault();
+                    // Simulate keyup
+                    const event = new KeyboardEvent('keyup', { 
+                        key: key, 
+                        code: code, 
+                        bubbles: true,
+                        cancelable: true
+                    });
+                    document.dispatchEvent(event);
+                    
+                    // Reset style
+                    btn.style.transform = '';
+                    btn.style.boxShadow = '';
+                    btn.style.background = '';
+                };
+                
+                btn.addEventListener('touchstart', handlePress, { passive: false });
+                btn.addEventListener('touchend', handleRelease, { passive: false });
+                btn.addEventListener('touchcancel', handleRelease, { passive: false });
+                
+                // Also support mouse for testing on desktop
+                btn.addEventListener('mousedown', handlePress);
+                btn.addEventListener('mouseup', handleRelease);
+                btn.addEventListener('mouseleave', handleRelease);
+            });
+        }
+        
+        // Initialize when window loads
+        window.addEventListener('load', () => {
+            setTimeout(initVirtualJoypad, 1000);
+        });
+
+        function toggleControllerDrawer(show) {
+            const drawer = document.getElementById('controllerDrawer');
+            const arrow = document.getElementById('controllerArrow');
+            const canvas = document.getElementById('canvas');
+            
+            if (show === true) drawer.classList.add('active');
+            else if (show === false) drawer.classList.remove('active');
+            else drawer.classList.toggle('active');
+            
+            const isActive = drawer.classList.contains('active');
+            if (arrow) {
+                arrow.textContent = isActive ? '▼' : '▲';
+            }
+            
+            // Shrink canvas on desktop when drawer is active to prevent overlap
+            if (window.innerWidth > 768) {
+                if (isActive) {
+                    canvas.style.setProperty('max-height', 'calc(100vh - 460px)', 'important');
+                } else {
+                    canvas.style.setProperty('max-height', '100%', 'important');
+                }
+                
+                // Force reset canvas attributes to help MAME recalculate
+                canvas.width = 320;
+                canvas.height = 240;
+                
+                setTimeout(() => window.dispatchEvent(new Event('resize')), 300); // Wait for transition
+            }
+        }
+    </script>
+
+
+
+    <!-- Controller Drawer -->
+    <div id="controllerDrawer" class="controller-drawer">
+        <div class="controller-content">
+            <div class="virtual-joypad" id="virtualJoypad" style="display: flex; margin: 0 auto;">
+                <div class="controller-handle" onclick="toggleControllerDrawer()">
+                    <span id="controllerArrow">▲</span>
+                </div>
+                <div class="joypad-top">
+                    <div class="joy-btn-trigger" data-key="z" data-code="KeyZ" id="btnL">L</div>
+                    <div class="center-buttons mobile-only">
+                        <div class="joy-btn-trigger btn-small" data-key="5" data-code="Digit5" id="btnSelect_m">Select</div>
+                        <div class="joy-btn-trigger btn-small" data-key="1" data-code="Digit1" id="btnStart_m">Start</div>
+                    </div>
+                    <div class="joy-btn-trigger" data-key="x" data-code="KeyX" id="btnR">R</div>
+                </div>
+                <div class="joypad-middle">
+                    <div class="dpad">
+                        <div class="joy-btn-trigger dpad-btn" data-key="ArrowUp" data-code="ArrowUp" id="btnUp">▲</div>
+                        <div class="dpad-mid">
+                            <div class="joy-btn-trigger dpad-btn" data-key="ArrowLeft" data-code="ArrowLeft" id="btnLeft">◀</div>
+                            <div class="dpad-center"></div>
+                            <div class="joy-btn-trigger dpad-btn" data-key="ArrowRight" data-code="ArrowRight" id="btnRight">▶</div>
+                        </div>
+                        <div class="joy-btn-trigger dpad-btn" data-key="ArrowDown" data-code="ArrowDown" id="btnDown">▼</div>
+                    </div>
+                    
+                    <div class="center-container">
+                        <div class="center-buttons desktop-only">
+                            <div class="joy-btn-trigger btn-small" data-key="5" data-code="Digit5" id="btnSelect">Select</div>
+                            <div class="joy-btn-trigger btn-small" data-key="1" data-code="Digit1" id="btnStart">Start</div>
+                        </div>
+                        <img src="welcome-logo.jpg" alt="Funtech Logo" class="joypad-logo">
+                    </div>
+                    
+                    <div class="action-buttons">
+                        <div class="joy-btn-trigger" data-key="Alt" data-code="AltLeft" id="btnX">X</div>
+                        <div class="joy-btn-trigger" data-key="Shift" data-code="ShiftLeft" id="btnY">Y</div>
+                        <div class="joy-btn-trigger" data-key="Control" data-code="ControlLeft" id="btnA">A</div>
+                        <div class="joy-btn-trigger" data-key=" " data-code="Space" id="btnB">B</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="debugDrawer" class="debug-drawer">
+        <div class="debug-handle" onclick="toggleDebugDrawer()">
+            <span id="debugArrow">▲</span>
+        </div>
+        <div style="font-size: 11px; font-weight: 800; color: var(--primary-color); padding: 10px 10px 0 10px;">DEBUG LOG (F2)</div>
+        <div id="debugLog"></div>
+    </div>
+</body>
+</html>
