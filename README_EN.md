@@ -46,7 +46,7 @@ This is one of the project's most significant technical breakthroughs. The UM661
 - **Dual video rendering modes**: Support toggling between "Hardware Acceleration (WebGL)" and "Software Rendering", with automatic preference saving
 - **Three-state audio core toggle**: Support toggling between "Auto", "Original", and "Fixed" modes, allowing players to choose their audio preference, with automatic preference saving
 - **Reliable mute control**: Dedicated GainNode, bypassing Emscripten's forced audio resume
-- **📱 Mobile Virtual D-Pad**: On-screen controls for touch devices; hidden in a bottom drawer on desktop, always visible on mobile with automatic viewport scaling
+- **📱 Mobile Virtual D-Pad**: On-screen controls for touch devices with **diagonal input support** (e.g., top-right combo); hidden in a bottom drawer on desktop, always visible on mobile with automatic viewport scaling
 
 ### 📚 Complete Digital Archive
 A built-in digital museum covers all **12 official titles** with release year, developer info, and high-resolution cover art.
