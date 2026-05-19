@@ -696,14 +696,9 @@ body {
 
 /* D-Pad */
 .dpad {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.dpad-mid {
-    display: flex;
-    align-items: center;
+    display: grid;
+    grid-template-columns: repeat(3, 45px);
+    grid-template-rows: repeat(3, 45px);
 }
 
 .dpad-btn {
@@ -716,6 +711,17 @@ body {
     width: 45px;
     height: 45px;
     background: #222;
+}
+
+.dpad-btn.dpad-diag {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.dpad-btn.dpad-diag:active {
+    transform: none !important;
+    box-shadow: none !important;
+    background: rgba(255, 61, 0, 0.2) !important;
 }
 
 /* Center Buttons (Select/Start) */

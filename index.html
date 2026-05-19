@@ -1017,36 +1017,49 @@
             console.log(`[Joypad] Initializing ${buttons.length} buttons`);
             
             buttons.forEach(btn => {
-                const key = btn.getAttribute('data-key');
-                const code = btn.getAttribute('data-code');
+                const keyAttr = btn.getAttribute('data-key');
+                const codeAttr = btn.getAttribute('data-code');
+                const keysAttr = btn.getAttribute('data-keys');
+                const codesAttr = btn.getAttribute('data-codes');
+                
+                const keys = keysAttr ? keysAttr.split(',') : [keyAttr];
+                const codes = codesAttr ? codesAttr.split(',') : [codeAttr];
                 
                 const handlePress = (e) => {
                     e.preventDefault();
                     // Simulate keydown
-                    const event = new KeyboardEvent('keydown', { 
-                        key: key, 
-                        code: code, 
-                        bubbles: true,
-                        cancelable: true
+                    keys.forEach((key, index) => {
+                        if (!key) return;
+                        const event = new KeyboardEvent('keydown', { 
+                            key: key, 
+                            code: codes[index], 
+                            bubbles: true,
+                            cancelable: true
+                        });
+                        document.dispatchEvent(event);
                     });
-                    document.dispatchEvent(event);
                     
                     // Add active class for visual feedback on touch
-                    btn.style.transform = 'translateY(4px)';
-                    btn.style.boxShadow = '0 0 0 #111';
-                    btn.style.background = 'var(--primary-color)';
+                    if (!btn.classList.contains('dpad-diag')) {
+                        btn.style.transform = 'translateY(4px)';
+                        btn.style.boxShadow = '0 0 0 #111';
+                        btn.style.background = 'var(--primary-color)';
+                    }
                 };
                 
                 const handleRelease = (e) => {
                     e.preventDefault();
                     // Simulate keyup
-                    const event = new KeyboardEvent('keyup', { 
-                        key: key, 
-                        code: code, 
-                        bubbles: true,
-                        cancelable: true
+                    keys.forEach((key, index) => {
+                        if (!key) return;
+                        const event = new KeyboardEvent('keyup', { 
+                            key: key, 
+                            code: codes[index], 
+                            bubbles: true,
+                            cancelable: true
+                        });
+                        document.dispatchEvent(event);
                     });
-                    document.dispatchEvent(event);
                     
                     // Reset style
                     btn.style.transform = '';
@@ -1120,13 +1133,20 @@
                 </div>
                 <div class="joypad-middle">
                     <div class="dpad">
+                        <!-- Row 1 -->
+                        <div class="joy-btn-trigger dpad-btn dpad-diag" data-keys="ArrowUp,ArrowLeft" data-codes="ArrowUp,ArrowLeft" id="btnUpLeft"></div>
                         <div class="joy-btn-trigger dpad-btn" data-key="ArrowUp" data-code="ArrowUp" id="btnUp">▲</div>
-                        <div class="dpad-mid">
-                            <div class="joy-btn-trigger dpad-btn" data-key="ArrowLeft" data-code="ArrowLeft" id="btnLeft">◀</div>
-                            <div class="dpad-center"></div>
-                            <div class="joy-btn-trigger dpad-btn" data-key="ArrowRight" data-code="ArrowRight" id="btnRight">▶</div>
-                        </div>
+                        <div class="joy-btn-trigger dpad-btn dpad-diag" data-keys="ArrowUp,ArrowRight" data-codes="ArrowUp,ArrowRight" id="btnUpRight"></div>
+                        
+                        <!-- Row 2 -->
+                        <div class="joy-btn-trigger dpad-btn" data-key="ArrowLeft" data-code="ArrowLeft" id="btnLeft">◀</div>
+                        <div class="dpad-center"></div>
+                        <div class="joy-btn-trigger dpad-btn" data-key="ArrowRight" data-code="ArrowRight" id="btnRight">▶</div>
+                        
+                        <!-- Row 3 -->
+                        <div class="joy-btn-trigger dpad-btn dpad-diag" data-keys="ArrowDown,ArrowLeft" data-codes="ArrowDown,ArrowLeft" id="btnDownLeft"></div>
                         <div class="joy-btn-trigger dpad-btn" data-key="ArrowDown" data-code="ArrowDown" id="btnDown">▼</div>
+                        <div class="joy-btn-trigger dpad-btn dpad-diag" data-keys="ArrowDown,ArrowRight" data-codes="ArrowDown,ArrowRight" id="btnDownRight"></div>
                     </div>
                     
                     <div class="center-container">
