@@ -182,3 +182,9 @@ Based on the latest MAME core, this project further fixes the DMA handshake and 
 ## 📜 Disclaimer
 
 The emulator core in this project is derived from the open-source project [MAME](https://github.com/mamedev/mame), with specialized modifications for historical preservation and academic research of the Super A'Can. All game ROM copyrights belong to their respective owners. No ROM files are provided or distributed by this project.
+
+---
+
+## 🎉 Congratulations on the Official Birth of the Native EXE Emulator!
+
+This emulator is built based on JS + MAME. If you are looking for an even better EXE execution experience, please visit BillyJr's Facebook page (https://www.facebook.com/profile.php?id=61579382638861), where he has developed a Windows executable version (https://www.facebook.com/permalink.php?story_fbid=122174846582979421&id=61579382638861). Special congratulations on the birth of the Super A'can native emulator!
